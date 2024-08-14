@@ -3,7 +3,8 @@ const ctx = canvas.getContext('2d');
 
 let paddleWidth = 150;
 let paddleHeight = 20;
-let paddleX = (canvas.width - paddleWidth) / 2;
+let playerPaddleX = (canvas.width - paddleWidth) / 2;
+let opponentPaddleX = (canvas.width - paddleWidth) / 2;
 
 let ballRadius = 10;
 let ballX = canvas.width / 2;
@@ -40,9 +41,9 @@ function keyUpHandler(e) {
     }
 }
 
-function drawPaddle() {
+function drawPaddle(x, y) {
     ctx.beginPath();
-    ctx.rect(paddleX, canvas.height - paddleHeight - 10, paddleWidth, paddleHeight);
+    ctx.rect(x, y, paddleWidth, paddleHeight);
     ctx.fillStyle = "#0095DD";
     ctx.fill();
     ctx.closePath();
@@ -106,9 +107,9 @@ function simulateBallPhysics() {
     ballX += ballDX;
     ballY += ballDY;
 
-    // Ball bounces off the ground
+    // Ball bounces off the player's paddle
     if (ballY + ballRadius > canvas.height - paddleHeight - 10) {
-        if (ballX > paddleX && ballX < paddleX + paddleWidth) {
+        if (ballX > playerPaddleX && ballX < playerPaddleX + paddleWidth) {
             ballDY = -ballDY * bounceFactor;
             updateScore('player');
         } else {
@@ -117,9 +118,15 @@ function simulateBallPhysics() {
         }
     }
 
-    // Ball hits the top wall
-    if (ballY - ballRadius < 0) {
-        ballDY = -ballDY;
+    // Ball bounces off the opponent's paddle
+    if (ballY - ballRadius < paddleHeight + 10) {
+        if (ballX > opponentPaddleX && ballX < opponentPaddleX + paddleWidth) {
+            ballDY = -ballDY * bounceFactor;
+            updateScore('opponent');
+        } else {
+            resetBall();
+            updateScore('player');
+        }
     }
 
     // Ball hits the side walls
@@ -128,18 +135,28 @@ function simulateBallPhysics() {
     }
 }
 
+function moveOpponentPaddle() {
+    if (ballX > opponentPaddleX + paddleWidth / 2) {
+        opponentPaddleX += 4;  // Move to the right
+    } else if (ballX < opponentPaddleX + paddleWidth / 2) {
+        opponentPaddleX -= 4;  // Move to the left
+    }
+}
+
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    drawPaddle();
+    drawPaddle(playerPaddleX, canvas.height - paddleHeight - 10);
+    drawPaddle(opponentPaddleX, 10);  // Opponent's paddle at the top
     drawBall();
     drawScore();
     simulateBallPhysics();
+    moveOpponentPaddle();
 
-    if (rightPressed && paddleX < canvas.width - paddleWidth) {
-        paddleX += 7;
-    } else if (leftPressed && paddleX > 0) {
-        paddleX -= 7;
+    if (rightPressed && playerPaddleX < canvas.width - paddleWidth) {
+        playerPaddleX += 7;
+    } else if (leftPressed && playerPaddleX > 0) {
+        playerPaddleX -= 7;
     }
 
     requestAnimationFrame(draw);
