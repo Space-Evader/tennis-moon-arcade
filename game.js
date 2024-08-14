@@ -1,106 +1,94 @@
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+const config = {
+    type: Phaser.AUTO,
+    width: 800,
+    height: 600,
+    backgroundColor: '#000',
+    scene: {
+        preload: preload,
+        create: create,
+        update: update
+    },
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { y: 0 },
+            debug: false
+        }
+    }
+};
 
-let paddleWidth = 100;
-let paddleHeight = 20;
-let paddleX = (canvas.width - paddleWidth) / 2;
-
-let ballRadius = 10;
-let ballX = canvas.width / 2;
-let ballY = canvas.height - 30;
-let ballDX = 2;
-let ballDY = -2;
-
-let rightPressed = false;
-let leftPressed = false;
-
+const game = new Phaser.Game(config);
+let player;
+let ball;
 let score = 0;
+let scoreText;
 
-document.addEventListener('keydown', keyDownHandler, false);
-document.addEventListener('keyup', keyUpHandler, false);
+function preload() {
+    this.load.image('ball', 'ball.png');
+    this.load.image('paddle', 'paddle.png');
+    this.load.image('background', 'background.png');
+}
 
-function keyDownHandler(e) {
-    if (e.key === "Right" || e.key === "ArrowRight") {
-        rightPressed = true;
-    } else if (e.key === "Left" || e.key === "ArrowLeft") {
-        leftPressed = true;
+function create() {
+    // Add background
+    this.add.image(400, 300, 'background');
+
+    // Create player paddle
+    player = this.physics.add.image(400, 550, 'paddle').setImmovable();
+    player.body.collideWorldBounds = true;
+
+    // Create ball
+    ball = this.physics.add.image(400, 300, 'ball');
+    ball.setCollideWorldBounds(true);
+    ball.setBounce(1);
+    ball.setVelocity(150, 150);
+
+    // Set up collision between ball and paddle
+    this.physics.add.collider(ball, player, hitPaddle, null, this);
+
+    // Set up input control
+    this.cursors = this.input.keyboard.createCursorKeys();
+
+    // Create score text
+    scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#FFF' });
+}
+
+function update() {
+    // Paddle movement
+    if (this.cursors.left.isDown) {
+        player.setVelocityX(-300);
+    } else if (this.cursors.right.isDown) {
+        player.setVelocityX(300);
+    } else {
+        player.setVelocityX(0);
+    }
+
+    // Check if ball is lost (ball goes below the paddle)
+    if (ball.y > 600) {
+        resetBall();
     }
 }
 
-function keyUpHandler(e) {
-    if (e.key === "Right" || e.key === "ArrowRight") {
-        rightPressed = false;
-    } else if (e.key === "Left" || e.key === "ArrowLeft") {
-        leftPressed = false;
+function hitPaddle(ball, player) {
+    // Increase score
+    score += 10;
+    scoreText.setText('Score: ' + score);
+
+    // Add a bit of randomness to ball bounce angle
+    let diff = 0;
+    if (ball.x < player.x) {
+        diff = player.x - ball.x;
+        ball.setVelocityX(-10 * diff);
+    } else if (ball.x > player.x) {
+        diff = ball.x - player.x;
+        ball.setVelocityX(10 * diff);
     }
-}
-
-function drawPaddle() {
-    ctx.beginPath();
-    ctx.rect(paddleX, canvas.height - paddleHeight, paddleWidth, paddleHeight);
-    ctx.fillStyle = "#0095DD";
-    ctx.fill();
-    ctx.closePath();
-}
-
-function drawBall() {
-    ctx.beginPath();
-    ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
-    ctx.fillStyle = "#FF0000";
-    ctx.fill();
-    ctx.closePath();
-}
-
-function drawScore() {
-    ctx.font = "16px Arial";
-    ctx.fillStyle = "#FFF";
-    ctx.fillText("Score: " + score, 8, 20);
 }
 
 function resetBall() {
-    ballX = canvas.width / 2;
-    ballY = canvas.height - 30;
-    ballDX = 2;
-    ballDY = -2;
+    // Reset the ball to the center and reduce score
+    ball.setPosition(400, 300);
+    ball.setVelocity(150, 150);
     score -= 20;
+    scoreText.setText('Score: ' + score);
 }
-
-function collisionDetection() {
-    if (ballY + ballDY > canvas.height - ballRadius - paddleHeight) {
-        if (ballX > paddleX && ballX < paddleX + paddleWidth) {
-            ballDY = -ballDY;
-            score += 10;
-        } else if (ballY + ballDY > canvas.height - ballRadius) {
-            resetBall();
-        }
-    }
-}
-
-function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    drawPaddle();
-    drawBall();
-    drawScore();
-    collisionDetection();
-
-    if (ballX + ballDX > canvas.width - ballRadius || ballX + ballDX < ballRadius) {
-        ballDX = -ballDX;
-    }
-    if (ballY + ballDY < ballRadius) {
-        ballDY = -ballDY;
-    }
-
-    ballX += ballDX;
-    ballY += ballDY;
-
-    if (rightPressed && paddleX < canvas.width - paddleWidth) {
-        paddleX += 7;
-    } else if (leftPressed && paddleX > 0) {
-        paddleX -= 7;
-    }
-
-    requestAnimationFrame(draw);
-}
-
-draw();
