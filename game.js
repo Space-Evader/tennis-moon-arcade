@@ -1,94 +1,165 @@
-const config = {
-    type: Phaser.AUTO,
-    width: 800,
-    height: 600,
-    backgroundColor: '#000',
-    scene: {
-        preload: preload,
-        create: create,
-        update: update
-    },
-    physics: {
-        default: 'arcade',
-        arcade: {
-            gravity: { y: 0 },
-            debug: false
-        }
-    }
-};
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
 
-const game = new Phaser.Game(config);
-let player;
-let ball;
-let score = 0;
-let scoreText;
+let paddleWidth = 150;
+let paddleHeight = 20;
+let playerPaddleX = (canvas.width - paddleWidth) / 2;
+let opponentPaddleX = (canvas.width - paddleWidth) / 2;
 
-function preload() {
-    this.load.image('ball', 'ball.png');
-    this.load.image('paddle', 'paddle.png');
-    this.load.image('background', 'background.png');
-}
+let ballRadius = 10;
+let ballX = canvas.width / 2;
+let ballY = canvas.height - 50;
+let ballDX = 3;
+let ballDY = -3;
+let gravity = 0.2;
+let bounceFactor = 0.7;
 
-function create() {
-    // Add background
-    this.add.image(400, 300, 'background');
+let rightPressed = false;
+let leftPressed = false;
 
-    // Create player paddle
-    player = this.physics.add.image(400, 550, 'paddle').setImmovable();
-    player.body.collideWorldBounds = true;
+let playerScore = 0;
+let opponentScore = 0;
+let playerGamesWon = 0;
+let opponentGamesWon = 0;
 
-    // Create ball
-    ball = this.physics.add.image(400, 300, 'ball');
-    ball.setCollideWorldBounds(true);
-    ball.setBounce(1);
-    ball.setVelocity(150, 150);
+document.addEventListener('keydown', keyDownHandler, false);
+document.addEventListener('keyup', keyUpHandler, false);
 
-    // Set up collision between ball and paddle
-    this.physics.add.collider(ball, player, hitPaddle, null, this);
-
-    // Set up input control
-    this.cursors = this.input.keyboard.createCursorKeys();
-
-    // Create score text
-    scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '32px', fill: '#FFF' });
-}
-
-function update() {
-    // Paddle movement
-    if (this.cursors.left.isDown) {
-        player.setVelocityX(-300);
-    } else if (this.cursors.right.isDown) {
-        player.setVelocityX(300);
-    } else {
-        player.setVelocityX(0);
-    }
-
-    // Check if ball is lost (ball goes below the paddle)
-    if (ball.y > 600) {
-        resetBall();
+function keyDownHandler(e) {
+    if (e.key === "Right" || e.key === "ArrowRight") {
+        rightPressed = true;
+    } else if (e.key === "Left" || e.key === "ArrowLeft") {
+        leftPressed = true;
     }
 }
 
-function hitPaddle(ball, player) {
-    // Increase score
-    score += 10;
-    scoreText.setText('Score: ' + score);
+function keyUpHandler(e) {
+    if (e.key === "Right" || e.key === "ArrowRight") {
+        rightPressed = false;
+    } else if (e.key === "Left" || e.key === "ArrowLeft") {
+        leftPressed = false;
+    }
+}
 
-    // Add a bit of randomness to ball bounce angle
-    let diff = 0;
-    if (ball.x < player.x) {
-        diff = player.x - ball.x;
-        ball.setVelocityX(-10 * diff);
-    } else if (ball.x > player.x) {
-        diff = ball.x - player.x;
-        ball.setVelocityX(10 * diff);
+function drawPaddle(x, y) {
+    ctx.beginPath();
+    ctx.rect(x, y, paddleWidth, paddleHeight);
+    ctx.fillStyle = "#0095DD";
+    ctx.fill();
+    ctx.closePath();
+}
+
+function drawBall() {
+    ctx.beginPath();
+    ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
+    ctx.fillStyle = "#FF0000";
+    ctx.fill();
+    ctx.closePath();
+}
+
+function drawScore() {
+    ctx.font = "16px Arial";
+    ctx.fillStyle = "#FFF";
+    ctx.fillText("Player: " + tennisScore(playerScore), 8, 20);
+    ctx.fillText("Opponent: " + tennisScore(opponentScore), 8, 40);
+    ctx.fillText("Player Games Won: " + playerGamesWon, 8, 60);
+    ctx.fillText("Opponent Games Won: " + opponentGamesWon, 8, 80);
+}
+
+function tennisScore(points) {
+    switch (points) {
+        case 0: return "0";
+        case 1: return "15";
+        case 2: return "30";
+        case 3: return "40";
+        case 4: return "Adv";
+        default: return "Game";
     }
 }
 
 function resetBall() {
-    // Reset the ball to the center and reduce score
-    ball.setPosition(400, 300);
-    ball.setVelocity(150, 150);
-    score -= 20;
-    scoreText.setText('Score: ' + score);
+    ballX = canvas.width / 2;
+    ballY = canvas.height - 50;
+    ballDX = 3;
+    ballDY = -3;
 }
+
+function updateScore(winner) {
+    if (winner === 'player') {
+        playerScore++;
+    } else {
+        opponentScore++;
+    }
+
+    if (playerScore >= 4 && playerScore - opponentScore >= 2) {
+        playerGamesWon++;
+        playerScore = 0;
+        opponentScore = 0;
+    } else if (opponentScore >= 4 && opponentScore - playerScore >= 2) {
+        opponentGamesWon++;
+        playerScore = 0;
+        opponentScore = 0;
+    }
+}
+
+function simulateBallPhysics() {
+    ballDY += gravity;
+    ballX += ballDX;
+    ballY += ballDY;
+
+    // Ball bounces off the player's paddle
+    if (ballY + ballRadius > canvas.height - paddleHeight - 10) {
+        if (ballX > playerPaddleX && ballX < playerPaddleX + paddleWidth) {
+            ballDY = -ballDY * bounceFactor;
+            updateScore('player');
+        } else {
+            resetBall();
+            updateScore('opponent');
+        }
+    }
+
+    // Ball bounces off the opponent's paddle
+    if (ballY - ballRadius < paddleHeight + 10) {
+        if (ballX > opponentPaddleX && ballX < opponentPaddleX + paddleWidth) {
+            ballDY = -ballDY * bounceFactor;
+            updateScore('opponent');
+        } else {
+            resetBall();
+            updateScore('player');
+        }
+    }
+
+    // Ball hits the side walls
+    if (ballX + ballRadius > canvas.width || ballX - ballRadius < 0) {
+        ballDX = -ballDX;
+    }
+}
+
+function moveOpponentPaddle() {
+    if (ballX > opponentPaddleX + paddleWidth / 2) {
+        opponentPaddleX += 4;  // Move to the right
+    } else if (ballX < opponentPaddleX + paddleWidth / 2) {
+        opponentPaddleX -= 4;  // Move to the left
+    }
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    drawPaddle(playerPaddleX, canvas.height - paddleHeight - 10);
+    drawPaddle(opponentPaddleX, 10);  // Opponent's paddle at the top
+    drawBall();
+    drawScore();
+    simulateBallPhysics();
+    moveOpponentPaddle();
+
+    if (rightPressed && playerPaddleX < canvas.width - paddleWidth) {
+        playerPaddleX += 7;
+    } else if (leftPressed && playerPaddleX > 0) {
+        playerPaddleX -= 7;
+    }
+
+    requestAnimationFrame(draw);
+}
+
+draw();
